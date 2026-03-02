@@ -2,6 +2,9 @@
 
 # DeepSaber: Deep Learning for high dimensional choreography
 
+This repository is a fork of [this repository](https://github.com/ronaldluc/DeepSaber).
+I am introducing some improvements as part of my class project.
+
 For the results, please see [the thesis PDF](misc/DeepSaber_Deep_Learning_for_high_dimensional_choreography.pdf).
 
 This project requires Python 3.8+, TF 2.2+ (recommended TF 2.3). See [`Dockerfile`](Dockerfile).
