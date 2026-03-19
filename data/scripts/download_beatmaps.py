@@ -9,8 +9,10 @@ import shutil
 import tqdm
 from urllib.parse import quote
 
-downloadfolder = "downloads"
+RATING_THRESHOLD = 0.8
+DAYS_AGO_START = 90
 
+downloadfolder = "downloads"
 historyfile = "history.txt"
 
 folders = [downloadfolder]
@@ -46,7 +48,7 @@ def downloadSong(song):
         "\\", "-").replace(":", "-").replace("*", "-").replace("?", "-").replace("\"", "-").replace("<", "-").replace(">", "-").replace("|", "-")
     if f"{song['id']},{song['uploaded']}".strip() not in downloaded:
         rating: float = getRating(song['stats']['upvotes'], song['stats']['downvotes'])
-        if rating < 80.0:
+        if rating < RATING_THRESHOLD:
             print(f"Skipping {song['metadata']['songName']} by {song['metadata']['levelAuthorName']} | ID: {song['id']} | Rating: {rating} | Upvotes: {song['stats']['upvotes']} | Downvotes: {song['stats']['downvotes']}")
             writeHistory(song['id'], song['uploaded'])
             return
@@ -68,7 +70,7 @@ def downloadSong(song):
         print(f"Downloaded '{songfilename}'")
 
     else:
-        print(f"Already downloaded {songfilename}")
+        print(f"Already seen {songfilename}")
 
 
 def main(date: str):
@@ -86,6 +88,6 @@ def main(date: str):
 
 if __name__ == "__main__":
     print("Starting scraper")
-    start_date: datetime = datetime.now() - timedelta(days=30)
+    start_date: datetime = datetime.now() - timedelta(days=DAYS_AGO_START)
     start_date_str: str = start_date.strftime('%Y-%m-%dT%H:%M:%S+00:00').strip()
     main(start_date_str)
