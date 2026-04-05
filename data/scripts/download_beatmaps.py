@@ -77,21 +77,23 @@ def downloadSong(song):
         print(f"Already seen {songfilename}")
 
 
-def main(date: str):
-    url = f"https://api.beatsaver.com/maps/latest?before={quote(date, safe='')}&sort=LAST_PUBLISHED&automapper=false"
-    response = requests.get(url)
-    print(f"fetched {url}")
-    maps = response.json()
-    lsong = 0
-    for song in maps["docs"]:
-        try: downloadSong(song)
-        except Exception as e: exit(e)
-        lsong = song
-    main(lsong["uploaded"])
-
-
-if __name__ == "__main__":
+def main():
     print("Starting scraper")
     start_date: datetime = datetime.now() - timedelta(days=DAYS_AGO_START)
     start_date_str: str = start_date.strftime('%Y-%m-%dT%H:%M:%S+00:00').strip()
-    main(start_date_str)
+    
+    while True:
+        url = f"https://api.beatsaver.com/maps/latest?before={quote(start_date_str, safe='')}&sort=LAST_PUBLISHED&automapper=false"
+        response = requests.get(url)
+        print(f"fetched {url}")
+        maps = response.json()
+        lsong = 0
+        for song in maps["docs"]:
+            try: downloadSong(song)
+            except Exception as e: exit(e)
+            lsong = song
+        start_date_str = lsong['uploaded']
+
+
+if __name__ == "__main__":
+    main()
