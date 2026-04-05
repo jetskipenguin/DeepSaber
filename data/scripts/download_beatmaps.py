@@ -46,6 +46,10 @@ def getRating(numUpvotes: int, numDownvotes: int) -> float:
 def downloadSong(song):
     songfilename = f"{song['id'] } ({song['metadata']['levelAuthorName']} - {song['metadata']['songName']})".replace("/", "-").replace(
         "\\", "-").replace(":", "-").replace("*", "-").replace("?", "-").replace("\"", "-").replace("<", "-").replace(">", "-").replace("|", "-")
+    if len(songfilename) > 255:
+        print(f"Filename too long for {songfilename}, skipping")
+        return
+
     if f"{song['id']},{song['uploaded']}".strip() not in downloaded:
         rating: float = getRating(song['stats']['upvotes'], song['stats']['downvotes'])
         if rating < RATING_THRESHOLD:
