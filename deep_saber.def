@@ -1,0 +1,12 @@
+Bootstrap: docker
+From: nvcr.io/nvidia/tensorflow:24.09-tf2-py3
+
+%files
+    # Copies requirements.txt from your host to the container's /opt directory
+    src/requirements.txt /opt/requirements.txt
+
+%post
+    # This section runs at build time with root privileges inside the container
+    # Update pip and install your packages
+    python -m pip install --upgrade pip
+    python -m pip install -r /opt/requirements.txt
