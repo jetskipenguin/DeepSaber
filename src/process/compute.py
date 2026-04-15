@@ -32,7 +32,8 @@ def one_beat_element_per_hand(df: pd.DataFrame) -> pd.Series:
     for hand in range(2):
         hands[hand] = hands[hand].iloc[0].drop(['_type', '_time'])
 
-    return hands[0].add_prefix('l').append(hands[1].add_prefix('r'))
+    # CHANGED: Replaced pandas .append() with pd.concat()
+    return pd.concat([hands[0].add_prefix('l'), hands[1].add_prefix('r')])
 
 
 @numba.njit()
@@ -102,10 +103,11 @@ def create_bpm_df(beatmap: JSON) -> pd.DataFrame:
     bpm_df['_value'] /= 1000
 
     if '_BPMChanges' in beatmap:
-        bpm_df = bpm_df.append(pd.DataFrame(beatmap['_BPMChanges'], columns=['_time', '_BPM'])
-                               .sort_values('_time')
-                               .rename(columns={'_BPM': '_value'}),
-                               ignore_index=True)
+        # CHANGED: Replaced pandas .append() with pd.concat()
+        bpm_changes_df = pd.DataFrame(beatmap['_BPMChanges'], columns=['_time', '_BPM']) \
+            .sort_values('_time') \
+            .rename(columns={'_BPM': '_value'})
+        bpm_df = pd.concat([bpm_df, bpm_changes_df], ignore_index=True)
 
     return bpm_df.loc[bpm_df['_value'] >= 30]  # BPM can't be zero
 
@@ -175,14 +177,15 @@ def merge_beat_elements(df: pd.DataFrame):
     :param df: beat elements
     :return:
     """
+    # NOTE: You already fixed this section in your provided code, keeping it intact!
     hands = [df.loc[df['_type'] == x]
-                 .drop_duplicates('_time', 'last')
+                 .drop_duplicates(subset='_time', keep='last')
                  .set_index('_time')
                  .drop(columns='_type')
              for x, hand in [[0, 'l'], [1, 'r']]]
     for hand in [0, 1]:
         not_in = hands[hand - 1].index.difference(hands[hand].index)
-        hands[hand] = hands[hand].append(hands[hand - 1].loc[not_in])
+        hands[hand] = pd.concat([hands[hand], hands[hand - 1].loc[not_in]])
     hands = [x.add_prefix(hand) for x, hand in zip(hands, ['l', 'r'])]
     out_df = pd.concat(hands, axis=1)
     return out_df
