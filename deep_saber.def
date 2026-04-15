@@ -10,3 +10,4 @@ From: nvcr.io/nvidia/tensorflow:24.09-tf2-py3
     # Update pip and install your packages
     python -m pip install --upgrade pip
     python -m pip install -r /opt/requirements.txt
+    python -m pip install jupyterlab
