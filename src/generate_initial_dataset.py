@@ -32,7 +32,7 @@ def main():
     # song_folders = create_song_list(config.dataset.beat_maps_folder)[:100]
     # config.dataset.storage_folder = base_folder / 'test_datasets'
     config.audio_processing.use_cache = False  # The audio features need to be computed the first time
-    config.use_multiprocessing = True  # since TF is not imported
+    config.use_multiprocessing = False  # since TF is not imported
 
     total = len(song_folders)
     print(f'Found {total} folders')
