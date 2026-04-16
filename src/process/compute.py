@@ -113,14 +113,43 @@ def create_bpm_df(beatmap: JSON) -> pd.DataFrame:
 
 
 def beatmap2beat_df(beatmap: JSON, info: JSON, config: Config) -> pd.DataFrame:
-    # Load notes
-    df: pd.DataFrame = pd.DataFrame(
-        (x for x in beatmap['_notes'] if '_time' in x),
-        columns=['_time', '_type', '_lineLayer', '_lineIndex', '_cutDirection', ],
-    ).astype(dtype={'_type': 'int8', '_lineLayer': 'int8', '_lineIndex': 'int8', '_cutDirection': 'int8'}, ) \
-        .sort_values('_time')
+    # 1. Detect version and normalize keys
+    # V2 uses '_notes', V3 uses 'colorNotes'
+    is_v3 = 'version' in beatmap and beatmap['version'].startswith('3')
+    
+    if is_v3:
+        notes_data = beatmap.get('colorNotes', [])
+        # Mapping V3 keys to your existing V2-style column names
+        key_map = {'b': '_time', 'c': '_type', 'layer': '_lineLayer', 'x': '_lineIndex', 'd': '_cutDirection'}
+    else:
+        notes_data = beatmap.get('_notes', [])
+        key_map = {k: k for k in ['_time', '_type', '_lineLayer', '_lineIndex', '_cutDirection']}
 
-    # Throw away bombs
+    if not notes_data:
+        raise ValueError("No notes found in beatmap file.")
+
+    # 2. Load notes using the mapped keys
+    # We extract only the fields we need and rename them to match your V2 logic
+    raw_notes = []
+    for x in notes_data:
+        # For V3, we use .get() with the new keys; for V2, it stays the same
+        note_dict = {new_k: x.get(old_k) for new_k, old_k in key_map.items()}
+        if note_dict['_time'] is not None:
+            raw_notes.append(note_dict)
+
+    df = pd.DataFrame(raw_notes)
+    
+    # Ensure types are correct
+    df = df.astype({
+        '_type': 'int8', 
+        '_lineLayer': 'int8', 
+        '_lineIndex': 'int8', 
+        '_cutDirection': 'int8'
+    }).sort_values('_time')
+
+    # 3. Throw away bombs
+    # In V2, type 3 is a bomb. In V3, bombs are in a separate 'bombNotes' list, 
+    # but we filter here just in case of V2 data.
     df = df.loc[df['_type'] != 3]
 
     df = df.sort_values(by=['_time', '_lineLayer'])
@@ -128,11 +157,13 @@ def beatmap2beat_df(beatmap: JSON, info: JSON, config: Config) -> pd.DataFrame:
     # Round to 2 decimal places for normalization for block alignment
     df['_time'] = round(df['_time'], 2)
 
-    # Compute actual time in seconds, not beats
+    # 4. Compute actual time in seconds
     bpm_df = create_bpm_df(beatmap)
-    df['_time'] = np.around(compute_true_time(df['_time'].to_numpy(dtype=np.float_),
-                                              bpm_df.to_numpy(dtype=np.float_),
-                                              info["_beatsPerMinute"]), 3)
+    df['_time'] = np.around(compute_true_time(
+        df['_time'].to_numpy(dtype=np.float_),
+        bpm_df.to_numpy(dtype=np.float_),
+        info["_beatsPerMinute"]
+    ), 3)
 
     out_df = merge_beat_elements(df)
 
