@@ -331,10 +331,11 @@ def audio2mfcc_df(signal: np.ndarray, samplerate: int, config: Config) -> pd.Dat
         raise ValueError('[process|audio] Signal longer than set maximum')
 
     # Stereo to mono
-    if signal.shape[1] == 2:
-        signal = (signal[:, 0] + signal[:, 1]) / 2
-    else:
-        signal = signal[:, 0]
+    if signal.ndim == 2:
+        if signal.shape[1] == 2:
+            signal = (signal[:, 0] + signal[:, 1]) / 2
+        else:
+            signal = signal[:, 0]
 
     # Pre-emphasize
     signal_preemphasized = speechpy.processing.preemphasis(signal, cof=0.98)  # TODO: should be used?
