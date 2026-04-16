@@ -107,7 +107,9 @@ def create_bpm_df(beatmap: JSON) -> pd.DataFrame:
         bpm_changes_df = pd.DataFrame(beatmap['_BPMChanges'], columns=['_time', '_BPM']) \
             .sort_values('_time') \
             .rename(columns={'_BPM': '_value'})
-        bpm_df = pd.concat([bpm_df, bpm_changes_df], ignore_index=True)
+        # Better approach in create_bpm_df:
+        if not bpm_changes_df.empty:
+            bpm_df = pd.concat([bpm_df, bpm_changes_df], ignore_index=True)
 
     return bpm_df.loc[bpm_df['_value'] >= 30]  # BPM can't be zero
 
