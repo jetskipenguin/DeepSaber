@@ -107,4 +107,5 @@ venv.bak/
 .idea/
 
 # data folders
+data/
 /OST
