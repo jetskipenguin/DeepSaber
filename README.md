@@ -3,13 +3,17 @@
 # DeepSaber: Deep Learning for high dimensional choreography
 
 TODO:
-- Figure out how to generate a dataset using the `generate_initial_dataset.py`
+- Figure out how to generate a dataset using the `generate_initial_dataset.py` X
+- Generate full dataset of all pkls
 - Figure out the structure of the predicted tensors
 - Come up with what metrics I want to add
 - Implement them in `metrics.py`
 - Add them to the `update_metrics.py`
-- Make sure the implemented metrics work
-- Consider downsampling and running training runs with different sampples
+- Make sure the implemented metrics work with small sample of pkls
+- Run full training run with all data 
+- Experiment with different sampling techniques
+- Write presentation
+- Write report
 
 This repository is a fork of [this repository](https://github.com/ronaldluc/DeepSaber).
 I am introducing some improvements as part of my class project.
