@@ -88,30 +88,39 @@ def compute_time_cols(df):
 
 
 def create_bpm_df(beatmap: JSON) -> pd.DataFrame:
-    """
-    Create df with bpm changing event
-    :param beatmap: json
-    :return:
-    """
-    bpm_df = pd.DataFrame(
-        beatmap['_events'],
-        columns=['_time', '_value', '_type']
-    ).sort_values('_time')
-    bpm_df = bpm_df.loc[
-        bpm_df['_type'] == 14
-        ].filter(items=['_time', '_value'])
-    bpm_df['_value'] /= 1000
+    # Detect V3
+    is_v3 = 'version' in beatmap and beatmap['version'].startswith('3')
+    
+    if is_v3:
+        # V3 BPM events are in bpmEvents
+        raw_events = beatmap.get('bpmEvents', [])
+        bpm_df = pd.DataFrame(raw_events)
+        if not bpm_df.empty:
+            # V3 keys: b = beat, m = bpm
+            bpm_df = bpm_df.rename(columns={'b': '_time', 'm': '_value'})
+            bpm_df = bpm_df.filter(items=['_time', '_value'])
+    else:
+        # V2 BPM events are type 14 in the _events list
+        events = beatmap.get('_events', [])
+        bpm_df = pd.DataFrame(events, columns=['_time', '_value', '_type'])
+        if not bpm_df.empty:
+            bpm_df = bpm_df.loc[bpm_df['_type'] == 14].filter(items=['_time', '_value'])
+            bpm_df['_value'] /= 1000
 
+    # Handle the extra BPM changes field if it exists
     if '_BPMChanges' in beatmap:
-        # CHANGED: Replaced pandas .append() with pd.concat()
         bpm_changes_df = pd.DataFrame(beatmap['_BPMChanges'], columns=['_time', '_BPM']) \
-            .sort_values('_time') \
             .rename(columns={'_BPM': '_value'})
-        # Better approach in create_bpm_df:
-        if not bpm_changes_df.empty:
+        if not bpm_df.empty:
             bpm_df = pd.concat([bpm_df, bpm_changes_df], ignore_index=True)
+        else:
+            bpm_df = bpm_changes_df
 
-    return bpm_df.loc[bpm_df['_value'] >= 30]  # BPM can't be zero
+    if bpm_df.empty:
+        # Return a dummy DF with the correct columns to avoid downstream crashes
+        return pd.DataFrame(columns=['_time', '_value'])
+
+    return bpm_df.loc[bpm_df['_value'] >= 30].sort_values('_time')
 
 
 def beatmap2beat_df(beatmap: JSON, info: JSON, config: Config) -> pd.DataFrame:
