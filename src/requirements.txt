@@ -7,7 +7,7 @@ scikit-learn
 Scrapy
 textblob
 numba
-bayesian-optimization
+bayesian-optimization<2.0.0
 pandas
 speechpy 
 soundfile 

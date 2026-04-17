@@ -1,7 +1,7 @@
 from datetime import datetime
 
 import numpy as np
-from tensorflow import keras as K
+import tensorflow as tf
 
 from train.sequence import BeatmapSequence, OnEpochEnd
 from utils.types import Config
@@ -10,10 +10,10 @@ from utils.types import Config
 def create_callbacks(train_seq: BeatmapSequence, config: Config):
     logdir = f'../data/logdir1/model_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}'
     callbacks = [
-        # K.callbacks.TensorBoard(logdir, histogram_freq=0),    # Slows auto search. Enable if experimenting by hand.
+        # tf.keras.callbacks.TensorBoard(logdir, histogram_freq=0),    # Slows auto search. Enable if experimenting by hand.
         # ForgivingEarlyStopping(monitor='val_avs_dist', max_forgiveness=0.003, patience=8, verbose=0, mode='auto',
         #                        baseline=None, restore_best_weights=True),
-        K.callbacks.EarlyStopping(monitor='val_avs_dist', min_delta=0.001, patience=7, verbose=0, mode='auto',
+        tf.keras.callbacks.EarlyStopping(monitor='val_avs_dist', min_delta=0.001, patience=7, verbose=0, mode='auto',
                                   baseline=None, restore_best_weights=True),
         OnEpochEnd([train_seq]),
     ]
@@ -21,7 +21,7 @@ def create_callbacks(train_seq: BeatmapSequence, config: Config):
     return callbacks
 
 
-class ForgivingEarlyStopping(K.callbacks.EarlyStopping):
+class ForgivingEarlyStopping(tf.keras.callbacks.EarlyStopping):
     """Stop training when a monitored metric has worsen significantly (over `max_delta`).
 
     Arguments:

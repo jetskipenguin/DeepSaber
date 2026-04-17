@@ -3,17 +3,12 @@ import random
 from typing import List, Callable, Optional
 
 import gensim
-import kerastuner as kt
+import keras_tuner as kt
 import numpy as np
 import tensorflow as tf
-import tensorflow_addons as tfa
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
-from tensorflow.python.eager import backprop
-from tensorflow.python.keras.engine import data_adapter
-from tensorflow.python.keras.engine.training import _minimize
-from tensorflow.python.ops import embedding_ops
 
 from train import metrics
 from train.learning_rate_schedule import FlatCosAnnealSchedule
@@ -42,7 +37,7 @@ def drop_batch(y):
 
 class AVSModel(Model):
     """
-    Train/test step modification works only on TF2.2+.
+    Train/test step modification updated for Keras 3 / TF 2.16+.
 
     AVSModel computes action vector space related metrics from any
     of the 3 used action data input/output representation.
@@ -67,6 +62,13 @@ class AVSModel(Model):
             'id_perplexity': metrics.Perplexity('perplexity'),
         }
         self.config = config
+
+        # Lookahead properties
+        self.sync_period = 6
+        self.slow_step_size = 0.5
+        self.lookahead_step = tf.Variable(0, trainable=False, dtype=tf.int64)
+        self.slow_weights = None
+
         if not self.config.dataset.action_word_model_path.exists():
             raise FileNotFoundError(
                 f'Could not find FastText action embeddings ({self.config.dataset.action_word_model_path})'
@@ -81,33 +83,47 @@ class AVSModel(Model):
 
     @property
     def metrics(self) -> List:
-        metrics: List = super(AVSModel, self).metrics
-        return metrics + list(self.vector_metrics.values()) + list(self.id_metrics.values())
+        metrics_list = super(AVSModel, self).metrics
+        return metrics_list + list(self.vector_metrics.values()) + list(self.id_metrics.values())
 
     def train_step(self, data):
-        data = data_adapter.expand_1d(data)
-        x, y, sample_weight = data_adapter.unpack_x_y_sample_weight(data)
+        if len(data) == 3:
+            x, y, sample_weight = data
+        else:
+            x, y = data
+            sample_weight = None
 
-        with backprop.GradientTape() as tape:
+        with tf.GradientTape() as tape:
             y_pred = self(x, training=True)
-            loss = self.compiled_loss(y, y_pred, sample_weight, regularization_losses=self.losses)
-        _minimize(self.distribute_strategy, tape, self.optimizer, loss,
-                  self.trainable_variables)
+            loss = self.compute_loss(x=x, y=y, y_pred=y_pred, sample_weight=sample_weight)
+
+        gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+
+        # Manual Lookahead logic
+        if self.slow_weights is None:
+            self.slow_weights = [tf.Variable(w) for w in self.trainable_variables]
+
+        self.lookahead_step.assign_add(1)
+        if self.lookahead_step % self.sync_period == 0:
+            for fast_weight, slow_weight in zip(self.trainable_variables, self.slow_weights):
+                slow_weight.assign(slow_weight + self.slow_step_size * (fast_weight - slow_weight))
+                fast_weight.assign(slow_weight)
 
         self.update_metrics(y_pred, y, sample_weight, train=True)
-
         return self.get_metrics_dict()
 
     def test_step(self, data):
-        data = data_adapter.expand_1d(data)
-        x, y, sample_weight = data_adapter.unpack_x_y_sample_weight(data)
+        if len(data) == 3:
+            x, y, sample_weight = data
+        else:
+            x, y = data
+            sample_weight = None
 
         y_pred = self(x, training=False)
-        self.compiled_loss(
-            y, y_pred, sample_weight, regularization_losses=self.losses)
+        self.compute_loss(x=x, y=y, y_pred=y_pred, sample_weight=sample_weight)
 
         self.update_metrics(y_pred, y, sample_weight)
-
         return self.get_metrics_dict()
 
     def call(self, inputs, training=None, mask=None):
@@ -163,7 +179,7 @@ class AVSModel(Model):
     def avs_embedding(self, y):
         if 'word_id' in y:
             ids = tf.argmax(y['word_id'], axis=-1)
-            y_vec = embedding_ops.embedding_lookup_v2(self.embeddings, ids)
+            y_vec = tf.nn.embedding_lookup(self.embeddings, ids)
         else:
             y_word = y2action_word(y)
             y_vec = tf.numpy_function(self.word2word_vec, [y_word], tf.float32)
@@ -227,7 +243,7 @@ def baseline_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
     else:
         model = AVSModel(inputs=inputs, outputs=outputs, config=config)
 
-    opt = keras.optimizers.Adam(lr=config.training.initial_learning_rate)
+    opt = keras.optimizers.Adam(learning_rate=config.training.initial_learning_rate)
 
     model.compile(
         optimizer=opt,
@@ -279,7 +295,7 @@ def ddc_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
     else:
         model = AVSModel(inputs=inputs, outputs=outputs, config=config)
 
-    opt = keras.optimizers.Adam(lr=config.training.initial_learning_rate, clipnorm=5.0)
+    opt = keras.optimizers.Adam(learning_rate=config.training.initial_learning_rate, clipnorm=5.0)
 
     model.compile(
         optimizer=opt,
@@ -312,7 +328,7 @@ def custom_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
             for _ in range(config.training.cnn_repetition):
                 per_stream[col] = layers.concatenate(inputs=[layers.Conv1D(filters=basic_block_size // (s - 2),
                                                                            kernel_size=s,
-                                                                           activation=tfa.activations.mish,
+                                                                           activation=keras.activations.mish,
                                                                            padding='causal',
                                                                            kernel_initializer='lecun_normal',
                                                                            name=names.__next__())(per_stream[col])
@@ -335,7 +351,7 @@ def custom_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
         if i > 0:
             x = layers.Dropout(dropout)(x)
         x = layers.TimeDistributed(
-            layers.Dense(basic_block_size, activation=tfa.activations.mish, name=names.__next__(),
+            layers.Dense(basic_block_size, activation=keras.activations.mish, name=names.__next__(),
                          kernel_regularizer=keras.regularizers.l2(config.training.l2_regularization), ),
             name=names.__next__())(x)
 
@@ -377,12 +393,13 @@ def custom_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
                                             initial_learning_rate=config.training.initial_learning_rate,
                                             decay_steps=len(seq) * 28 + 400,
                                             alpha=0.01, )
-        # Ranger hyper params based on https://github.com/fastai/imagenette/blob/master/2020-01-train.md
-        opt = tfa.optimizers.RectifiedAdam(learning_rate=lr_schedule,
-                                           beta_1=0.95,
-                                           beta_2=0.99,
-                                           epsilon=1e-6)
-        opt = tfa.optimizers.Lookahead(opt, sync_period=6, slow_step_size=0.5)
+        
+        # Standard Adam replaces Ranger (RectifiedAdam) as TFA is deprecated in TF 2.16+.
+        # Warmup is handled natively by FlatCosAnnealSchedule; Lookahead is handled manually in AVSModel.
+        opt = keras.optimizers.Adam(learning_rate=lr_schedule,
+                                    beta_1=0.95,
+                                    beta_2=0.99,
+                                    epsilon=1e-6)
 
     model.compile(
         optimizer=opt,
@@ -402,7 +419,7 @@ def clstm_tuning_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
         per_stream = {}
         cnn_activation = {'relu': keras.activations.relu,
                           'elu': keras.activations.elu,
-                          'mish': tfa.activations.mish}[hp.Choice('cnn_activation', ['relu', 'mish'])]
+                          'mish': keras.activations.mish}[hp.Choice('cnn_activation', ['relu', 'mish'])]
 
         cat_cnn_repetition = hp.Int('cat_cnn_repetition', 0, 4)
         cnn_spatial_dropout = hp.Float('spatial_dropout', 0.0, 0.5)
@@ -510,12 +527,13 @@ def clstm_tuning_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
                                                                                 [3e-2, 1e-2, 8e-3]),
                                                 decay_steps=len(seq) * decay_end_epoch,
                                                 alpha=0.001, )
-            # Ranger hyper params based on https://github.com/fastai/imagenette/blob/master/2020-01-train.md
-            opt = tfa.optimizers.RectifiedAdam(learning_rate=lr_schedule,
-                                               beta_1=0.95,
-                                               beta_2=0.99,
-                                               epsilon=1e-6)
-            opt = tfa.optimizers.Lookahead(opt, sync_period=6, slow_step_size=0.5)
+            
+            # Standard Adam replaces Ranger (RectifiedAdam) as TFA is deprecated in TF 2.16+.
+            # Warmup is handled natively by FlatCosAnnealSchedule; Lookahead is handled manually in AVSModel.
+            opt = keras.optimizers.Adam(learning_rate=lr_schedule,
+                                        beta_1=0.95,
+                                        beta_2=0.99,
+                                        epsilon=1e-6)
 
         model.compile(
             optimizer=opt,
@@ -589,12 +607,13 @@ def multi_lstm_tuning_model(seq: BeatmapSequence, stateful, config: Config) -> M
                                                                                 [3e-2, 1e-2, 8e-3, ]),
                                                 decay_steps=len(seq) * 40,
                                                 alpha=0.01, )
-            # Ranger hyper params based on https://github.com/fastai/imagenette/blob/master/2020-01-train.md
-            opt = tfa.optimizers.RectifiedAdam(learning_rate=lr_schedule,
-                                               beta_1=0.95,
-                                               beta_2=0.99,
-                                               epsilon=1e-6)
-            opt = tfa.optimizers.Lookahead(opt, sync_period=6, slow_step_size=0.5)
+            
+            # Standard Adam replaces Ranger (RectifiedAdam) as TFA is deprecated in TF 2.16+.
+            # Warmup is handled natively by FlatCosAnnealSchedule; Lookahead is handled manually in AVSModel.
+            opt = keras.optimizers.Adam(learning_rate=lr_schedule,
+                                        beta_1=0.95,
+                                        beta_2=0.99,
+                                        epsilon=1e-6)
 
         model.compile(
             optimizer=opt,
@@ -656,7 +675,7 @@ def trivial_tuning_model(seq: BeatmapSequence, stateful, config: Config) -> Call
 
 
 def save_model(model, model_path, train_seq, config, hp: Optional[kt.HyperParameters] = None):
-    keras.mixed_precision.experimental.set_policy('float32')
+    keras.mixed_precision.set_global_policy('float32')
     config.training.batch_size = 1
     stateful_model = get_architecture_fn(config)(train_seq, True, config)
     if hp is not None:
