@@ -343,8 +343,11 @@ def custom_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
     for i in range(config.training.lstm_repetition):
         if i > 0:
             x = layers.Dropout(dropout)(x)
-        x = layers.LSTM(basic_block_size, return_sequences=True, stateful=stateful, name=names.__next__(),
-                        kernel_regularizer=keras.regularizers.l2(config.training.l2_regularization), )(x)
+        
+        # Bypassing the buggy LSTM wrapper by routing directly to the RNN Cell implementation
+        x = layers.RNN(layers.LSTMCell(basic_block_size,
+                                       kernel_regularizer=keras.regularizers.l2(config.training.l2_regularization)),
+                       return_sequences=True, stateful=stateful, name=names.__next__())(x)
         x = layers.BatchNormalization(name=names.__next__(), )(x)
 
     for i in range(config.training.dense_repetition):
@@ -472,9 +475,11 @@ def clstm_tuning_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
         for i in range(lstm_repetition):
             if i > 0:
                 x = layers.Dropout(lstm_dropout)(x)
-            x = layers.LSTM(hp.Int(f'lstm_{i}_units', 128, 384, sampling='log'), return_sequences=True,
-                            stateful=stateful, name=layer_names.__next__(),
-                            kernel_regularizer=keras.regularizers.l2(lstm_l2_regularizer), )(x)
+                
+            # Bypassing the buggy LSTM wrapper by routing directly to the RNN Cell implementation
+            x = layers.RNN(layers.LSTMCell(hp.Int(f'lstm_{i}_units', 128, 384, sampling='log'),
+                                           kernel_regularizer=keras.regularizers.l2(lstm_l2_regularizer)),
+                           return_sequences=True, stateful=stateful, name=layer_names.__next__())(x)
             x = layers.BatchNormalization(name=layer_names.__next__(), )(x)
 
         end_cnn_repetition = hp.Int('end_cnn_repetition', 0, 2)
