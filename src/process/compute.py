@@ -88,39 +88,57 @@ def compute_time_cols(df):
 
 
 def create_bpm_df(beatmap: JSON) -> pd.DataFrame:
-    # Detect V3
     is_v3 = 'version' in beatmap and beatmap['version'].startswith('3')
     
+    # Initialize an empty DataFrame with guaranteed columns
+    bpm_df = pd.DataFrame(columns=['_time', '_value'])
+    
     if is_v3:
-        # V3 BPM events are in bpmEvents
         raw_events = beatmap.get('bpmEvents', [])
-        bpm_df = pd.DataFrame(raw_events)
-        if not bpm_df.empty:
-            # V3 keys: b = beat, m = bpm
-            bpm_df = bpm_df.rename(columns={'b': '_time', 'm': '_value'})
-            bpm_df = bpm_df.filter(items=['_time', '_value'])
+        if raw_events:
+            temp_df = pd.DataFrame(raw_events)
+            # V3 uses 'b' (beat) and 'm' (bpm)
+            if 'b' in temp_df.columns and 'm' in temp_df.columns:
+                bpm_df = temp_df[['b', 'm']].rename(columns={'b': '_time', 'm': '_value'})
     else:
-        # V2 BPM events are type 14 in the _events list
         events = beatmap.get('_events', [])
-        bpm_df = pd.DataFrame(events, columns=['_time', '_value', '_type'])
-        if not bpm_df.empty:
-            bpm_df = bpm_df.loc[bpm_df['_type'] == 14].filter(items=['_time', '_value'])
-            bpm_df['_value'] /= 1000
+        if events:
+            # We don't force columns in the constructor to avoid NaNs if keys are missing
+            temp_df = pd.DataFrame(events)
+            # Only proceed if the columns we need actually exist in the JSON
+            if '_type' in temp_df.columns and '_time' in temp_df.columns:
+                # BPM changes in V2 are type 14
+                bpm_df = temp_df.loc[temp_df['_type'] == 14]
+                # Ensure '_value' exists (some events might skip it)
+                if not bpm_df.empty and '_value' in bpm_df.columns:
+                    bpm_df = bpm_df[['_time', '_value']].copy()
+                    bpm_df['_value'] /= 1000
+                else:
+                    # Reset to empty if type 14 exists but has no value
+                    bpm_df = pd.DataFrame(columns=['_time', '_value'])
 
-    # Handle the extra BPM changes field if it exists
+    # Handle the extra BPM changes field (used in some custom maps)
     if '_BPMChanges' in beatmap:
-        bpm_changes_df = pd.DataFrame(beatmap['_BPMChanges'], columns=['_time', '_BPM']) \
-            .rename(columns={'_BPM': '_value'})
-        if not bpm_df.empty:
-            bpm_df = pd.concat([bpm_df, bpm_changes_df], ignore_index=True)
-        else:
-            bpm_df = bpm_changes_df
+        raw_changes = beatmap.get('_BPMChanges', [])
+        if raw_changes:
+            bpm_changes_df = pd.DataFrame(raw_changes)
+            if '_time' in bpm_changes_df.columns and '_BPM' in bpm_changes_df.columns:
+                bpm_changes_df = bpm_changes_df[['_time', '_BPM']].rename(columns={'_BPM': '_value'})
+                
+                # Use list to concat to avoid FutureWarning and handle empty states
+                to_concat = [df for df in [bpm_df, bpm_changes_df] if not df.empty]
+                if to_concat:
+                    bpm_df = pd.concat(to_concat, ignore_index=True)
 
+    # Final Safety Check: If no BPM data found, use the default from info (if available)
     if bpm_df.empty:
-        # Return a dummy DF with the correct columns to avoid downstream crashes
         return pd.DataFrame(columns=['_time', '_value'])
 
-    return bpm_df.loc[bpm_df['_value'] >= 30].sort_values('_time')
+    # Ensure all values are numeric to prevent math errors later
+    bpm_df['_time'] = pd.to_numeric(bpm_df['_time'], errors='coerce')
+    bpm_df['_value'] = pd.to_numeric(bpm_df['_value'], errors='coerce')
+    
+    return bpm_df.loc[bpm_df['_value'] >= 30].sort_values('_time').dropna()
 
 
 def beatmap2beat_df(beatmap: JSON, info: JSON, config: Config) -> pd.DataFrame:
