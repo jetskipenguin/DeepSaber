@@ -89,7 +89,7 @@ class DatasetConfig:
         if self._word_id_num_classes > 0:
             return self._word_id_num_classes
         if self.action_word_model_path.exists():
-            self._word_id_num_classes = len(gensim.models.KeyedVectors.load(str(self.action_word_model_path)).vocab) + 2
+            self._word_id_num_classes = len(gensim.models.KeyedVectors.load(str(self.action_word_model_path)).key_to_index) + 2
         return self._word_id_num_classes
 
 
