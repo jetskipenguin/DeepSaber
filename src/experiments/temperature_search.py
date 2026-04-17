@@ -10,7 +10,8 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_addons as tfa
 from bayes_opt import BayesianOptimization
-from bayes_opt import JSONLogger, Events
+from bayes_opt.logger import JSONLogger
+from bayes_opt.event import Events
 from bayes_opt.util import load_logs
 from tensorflow import keras
 
