@@ -1,7 +1,12 @@
 import json
 import os
 import signal
+import sys
 from sys import stderr
+sys.path.append('../../../')
+sys.path.append('../../')
+sys.path.append('../')
+sys.path.append('.')
 
 import numba
 import numpy as np
@@ -32,7 +37,6 @@ def one_beat_element_per_hand(df: pd.DataFrame) -> pd.Series:
     for hand in range(2):
         hands[hand] = hands[hand].iloc[0].drop(['_type', '_time'])
 
-    # CHANGED: Replaced pandas .append() with pd.concat()
     return pd.concat([hands[0].add_prefix('l'), hands[1].add_prefix('r')])
 
 
@@ -45,7 +49,7 @@ def compute_true_time(beat_elements: np.ndarray, bpm_changes: np.ndarray, start_
     :param start_bpm: initial bpm
     :return: time of beat_elements in seconds
     """
-    true_time = np.zeros_like(beat_elements, dtype=np.float_)
+    true_time = np.zeros_like(beat_elements, dtype=np.float64)
 
     current_bpm = start_bpm
     current_beat = 0.0  # Current time in beats since beginning
@@ -88,7 +92,9 @@ def compute_time_cols(df):
 
 
 def create_bpm_df(beatmap: JSON) -> pd.DataFrame:
-    is_v3 = 'version' in beatmap and beatmap['version'].startswith('3')
+    # 1. Safely detect version
+    version_str = str(beatmap.get('version', beatmap.get('_version', '2')))
+    is_v3 = version_str.startswith('3')
     
     # Initialize an empty DataFrame with guaranteed columns
     bpm_df = pd.DataFrame(columns=['_time', '_value'])
@@ -97,27 +103,21 @@ def create_bpm_df(beatmap: JSON) -> pd.DataFrame:
         raw_events = beatmap.get('bpmEvents', [])
         if raw_events:
             temp_df = pd.DataFrame(raw_events)
-            # V3 uses 'b' (beat) and 'm' (bpm)
             if 'b' in temp_df.columns and 'm' in temp_df.columns:
                 bpm_df = temp_df[['b', 'm']].rename(columns={'b': '_time', 'm': '_value'})
     else:
         events = beatmap.get('_events', [])
         if events:
-            # We don't force columns in the constructor to avoid NaNs if keys are missing
             temp_df = pd.DataFrame(events)
-            # Only proceed if the columns we need actually exist in the JSON
             if '_type' in temp_df.columns and '_time' in temp_df.columns:
-                # BPM changes in V2 are type 14
                 bpm_df = temp_df.loc[temp_df['_type'] == 14]
-                # Ensure '_value' exists (some events might skip it)
                 if not bpm_df.empty and '_value' in bpm_df.columns:
                     bpm_df = bpm_df[['_time', '_value']].copy()
                     bpm_df['_value'] /= 1000
                 else:
-                    # Reset to empty if type 14 exists but has no value
                     bpm_df = pd.DataFrame(columns=['_time', '_value'])
 
-    # Handle the extra BPM changes field (used in some custom maps)
+    # Handle the extra BPM changes field
     if '_BPMChanges' in beatmap:
         raw_changes = beatmap.get('_BPMChanges', [])
         if raw_changes:
@@ -125,16 +125,13 @@ def create_bpm_df(beatmap: JSON) -> pd.DataFrame:
             if '_time' in bpm_changes_df.columns and '_BPM' in bpm_changes_df.columns:
                 bpm_changes_df = bpm_changes_df[['_time', '_BPM']].rename(columns={'_BPM': '_value'})
                 
-                # Use list to concat to avoid FutureWarning and handle empty states
                 to_concat = [df for df in [bpm_df, bpm_changes_df] if not df.empty]
                 if to_concat:
                     bpm_df = pd.concat(to_concat, ignore_index=True)
 
-    # Final Safety Check: If no BPM data found, use the default from info (if available)
     if bpm_df.empty:
         return pd.DataFrame(columns=['_time', '_value'])
 
-    # Ensure all values are numeric to prevent math errors later
     bpm_df['_time'] = pd.to_numeric(bpm_df['_time'], errors='coerce')
     bpm_df['_value'] = pd.to_numeric(bpm_df['_value'], errors='coerce')
     
@@ -142,33 +139,47 @@ def create_bpm_df(beatmap: JSON) -> pd.DataFrame:
 
 
 def beatmap2beat_df(beatmap: JSON, info: JSON, config: Config) -> pd.DataFrame:
-    # 1. Detect version and normalize keys
-    # V2 uses '_notes', V3 uses 'colorNotes'
-    is_v3 = 'version' in beatmap and beatmap['version'].startswith('3')
+    # 1. Safely detect version
+    version_str = str(beatmap.get('version', beatmap.get('_version', '2')))
+    is_v3 = version_str.startswith('3')
     
     if is_v3:
         notes_data = beatmap.get('colorNotes', [])
-        # Mapping V3 keys to your existing V2-style column names
+        # old_k (JSON key) : new_k (DataFrame key)
         key_map = {'b': '_time', 'c': '_type', 'layer': '_lineLayer', 'x': '_lineIndex', 'd': '_cutDirection'}
+        time_key = 'b'
     else:
         notes_data = beatmap.get('_notes', [])
-        key_map = {k: k for k in ['_time', '_type', '_lineLayer', '_lineIndex', '_cutDirection']}
+        key_map = {'_time': '_time', '_type': '_type', '_lineLayer': '_lineLayer', '_lineIndex': '_lineIndex', '_cutDirection': '_cutDirection'}
+        time_key = '_time'
 
     if not notes_data:
         raise ValueError("No notes found in beatmap file.")
 
-    # 2. Load notes using the mapped keys
-    # We extract only the fields we need and rename them to match your V2 logic
+    # 2. Extract notes safely (FIXED LOOP)
     raw_notes = []
     for x in notes_data:
-        # For V3, we use .get() with the new keys; for V2, it stays the same
-        note_dict = {new_k: x.get(old_k) for new_k, old_k in key_map.items()}
-        if note_dict['_time'] is not None:
+        if x.get(time_key) is not None:
+            note_dict = {}
+            for old_k, new_k in key_map.items():
+                val = x.get(old_k)
+                # Safely cast to float, defaulting to 0 if the key is missing or explicitly null in JSON
+                note_dict[new_k] = float(val) if val is not None else 0.0
             raw_notes.append(note_dict)
 
-    df = pd.DataFrame(raw_notes)
+    if not raw_notes:
+        raise ValueError("No valid notes with time data found.")
+
+    # 3. Explicitly define columns so Pandas correctly maps the dictionaries
+    df = pd.DataFrame(raw_notes, columns=['_time', '_type', '_lineLayer', '_lineIndex', '_cutDirection'])
     
-    # Ensure types are correct
+    # Clip modded values out of bounds BEFORE astype
+    df['_lineLayer'] = df['_lineLayer'].clip(0, 2)
+    df['_lineIndex'] = df['_lineIndex'].clip(0, 3)
+    df['_cutDirection'] = df['_cutDirection'].clip(0, 8)
+    df['_type'] = df['_type'].clip(0, 1) 
+
+    # Ensure types are correct and sort
     df = df.astype({
         '_type': 'int8', 
         '_lineLayer': 'int8', 
@@ -176,32 +187,29 @@ def beatmap2beat_df(beatmap: JSON, info: JSON, config: Config) -> pd.DataFrame:
         '_cutDirection': 'int8'
     }).sort_values('_time')
 
-    # 3. Throw away bombs
-    # In V2, type 3 is a bomb. In V3, bombs are in a separate 'bombNotes' list, 
-    # but we filter here just in case of V2 data.
+    # Throw away bombs
     df = df.loc[df['_type'] != 3]
-
     df = df.sort_values(by=['_time', '_lineLayer'])
 
-    # Round to 2 decimal places for normalization for block alignment
+    # Round to 2 decimal places for block alignment
     df['_time'] = round(df['_time'], 2)
 
     # 4. Compute actual time in seconds
     bpm_df = create_bpm_df(beatmap)
+    
+    if bpm_df.empty:
+        bpm_df = pd.DataFrame({'_time': [0.0], '_value': [info.get("_beatsPerMinute", 120.0)]})
+        
     df['_time'] = np.around(compute_true_time(
-        df['_time'].to_numpy(dtype=np.float_),
-        bpm_df.to_numpy(dtype=np.float_),
-        info["_beatsPerMinute"]
+        df['_time'].to_numpy(dtype=np.float64),
+        bpm_df.to_numpy(dtype=np.float64),
+        info.get("_beatsPerMinute", 120.0)
     ), 3)
 
     out_df = merge_beat_elements(df)
-
     out_df['word'] = compute_action_words(df)
-
     check_column_ranges(out_df, config)
-
     out_df = compute_time_cols(out_df)
-
     out_df.index = out_df.index.rename('time')
 
     return out_df
@@ -210,8 +218,6 @@ def beatmap2beat_df(beatmap: JSON, info: JSON, config: Config) -> pd.DataFrame:
 def compute_action_words(df):
     """
     Transform all beat elements with the same time stamp into one action, represented by a word.
-    Example: [{hand: L, _lineLayer: 0, _lineIndex: 1, _cutDirection: 2},
-              {hand: R, _lineLayer: 2, _lineIndex: 3, _cutDirection: 8}] -> 'L012_R238'
     """
     df = df.set_index('_time')
     df['hand'] = 'L'
@@ -252,11 +258,11 @@ def merge_beat_elements(df: pd.DataFrame):
 
 
 def path2beat_df(beatmap_path, info_path, config: Config) -> pd.DataFrame:
-    with open(info_path) as info_data:  # normalize across old and new version of beatmap files
+    with open(info_path, encoding='utf-8') as info_data:
         info = json.load(info_data)
         if 'beatsPerMinute' in info:
             info['_beatsPerMinute'] = info['beatsPerMinute']
-    with open(beatmap_path) as beatmap_data:
+    with open(beatmap_path, encoding='utf-8') as beatmap_data:
         beatmap = json.load(beatmap_data)
         return beatmap2beat_df(beatmap, info, config)
 
@@ -276,10 +282,11 @@ def process_song_folder(folder, config: Config, order=(0, 1)):
     """
     progress(*order, config=config, name='Processing song folders')
 
-    files = []  # TODO: Rewrite to use Pathlib
+    files = [] 
     for dirpath, dirnames, filenames in os.walk(folder):
         files.extend(filenames)
         break
+        
     info_path = os.path.join(folder, [x for x in files if 'info' in x.lower()][0])
     file_ogg = os.path.join(folder, [x for x in files if x.endswith('gg')][0])
     folder_name = folder.split('/')[-1]
@@ -287,15 +294,41 @@ def process_song_folder(folder, config: Config, order=(0, 1)):
 
     try:
         mfcc_df = path2mfcc_df(file_ogg, config=config)
-    except (ValueError, FileNotFoundError, AttributeError) as e:  # TODO: Remove AttributeError if not necessary
+    except (ValueError, FileNotFoundError, AttributeError) as e:
         print(f'\n\t[process | process_song_folder] Skipped file {folder_name}  |  {folder}:\n\t\t{e}', file=stderr)
         return None
 
+    # Load Info.dat to map difficulties to actual filenames
+    difficulty_mapping = {}
+    with open(info_path, 'r', encoding='utf-8') as f:
+        info_data = json.load(f)
+        
+    # Handle V2 and V3 Info structures
+    beatmap_sets = info_data.get('_difficultyBeatmapSets') or info_data.get('difficultyBeatmapSets') or []
+    for bset in beatmap_sets:
+        mode = bset.get('_beatmapCharacteristicName') or bset.get('beatmapCharacteristicName')
+        # Filter strictly for 'Standard' to ignore Lawless/360 modes
+        if mode == 'Standard':
+            maps = bset.get('_difficultyBeatmaps') or bset.get('difficultyBeatmaps') or []
+            for m in maps:
+                diff = m.get('_difficulty') or m.get('difficulty')
+                fname = m.get('_beatmapFilename') or m.get('beatmapFilename')
+                if diff and fname:
+                    difficulty_mapping[diff] = fname
+
     for difficulty in ['Easy', 'Normal', 'Hard', 'Expert', 'ExpertPlus']:
-        beatmap_path = [x for x in files if difficulty in x]
-        if beatmap_path:
+        # Retrieve the specific filename from the Info.dat mapping
+        beatmap_file = difficulty_mapping.get(difficulty)
+        
+        # Fallback to older string-matching if Info.dat didn't contain it
+        if not beatmap_file:
+            matches = [x for x in files if difficulty in x and x.endswith('.dat')]
+            if matches:
+                beatmap_file = matches[0]
+
+        if beatmap_file and beatmap_file in files:
             try:
-                beatmap_path = os.path.join(folder, beatmap_path[0])
+                beatmap_path = os.path.join(folder, beatmap_file)
                 df = path2beat_df(beatmap_path, info_path, config)
                 df = join_closest_index(df, mfcc_df, 'mfcc')
                 df = add_multiindex(df, difficulty, folder_name)
@@ -326,7 +359,6 @@ def add_previous_prediction(df: pd.DataFrame, config: Config):
     df = df.dropna().copy()
     df.loc[:, beat_elements_pp] = df[beat_elements_pp].astype('int8')
 
-    # Name and difficulty information is contained in the grouping operation
     indexes_to_drop = ['name', 'difficulty']
     df = df.reset_index(level=indexes_to_drop).drop(columns=indexes_to_drop)
     return df
@@ -344,7 +376,7 @@ def join_closest_index(df: pd.DataFrame, other: pd.DataFrame, other_name: str = 
     round_index = other.index.values[1] - other.index.values[0]
     df.index = np.floor(df.index / round_index).astype(int)
     other_offset = (other.index / round_index).astype(int).min() - 1
-    other = other.reset_index(drop=True)  # make sure whole int span is exactly covered
+    other = other.reset_index(drop=True)
     other.index = other.index + other_offset
 
     other.name = other_name
@@ -357,10 +389,6 @@ def join_closest_index(df: pd.DataFrame, other: pd.DataFrame, other_name: str = 
 
 
 def path2mfcc_df(ogg_path, config: Config) -> pd.DataFrame:
-    """
-    Generate MFCC audio representation for a given ogg file path.
-    The representation computed depends on `config.audio_processing` setting.
-    """
     cache_path = f'{".".join(ogg_path.split(".")[:-1])}.pkl'
 
     if os.path.exists(cache_path):
@@ -382,25 +410,21 @@ def path2mfcc_df(ogg_path, config: Config) -> pd.DataFrame:
         df.dropna(inplace=True)
 
     flatten = np.split(df.to_numpy().astype('float16').flatten(), len(df.index))
-    return pd.DataFrame(data={'mfcc': flatten},
-                        index=df.index)
+    return pd.DataFrame(data={'mfcc': flatten}, index=df.index)
 
 
 def audio2mfcc_df(signal: np.ndarray, samplerate: int, config: Config) -> pd.DataFrame:
     if len(signal) > config.audio_processing.signal_max_length:
         raise ValueError('[process|audio] Signal longer than set maximum')
 
-    # Stereo to mono
     if signal.ndim == 2:
         if signal.shape[1] == 2:
             signal = (signal[:, 0] + signal[:, 1]) / 2
         else:
             signal = signal[:, 0]
 
-    # Pre-emphasize
-    signal_preemphasized = speechpy.processing.preemphasis(signal, cof=0.98)  # TODO: should be used?
+    signal_preemphasized = speechpy.processing.preemphasis(signal, cof=0.98)
 
-    # Extract MFCC features
     mfcc = speechpy.feature.mfcc(signal_preemphasized,
                                  sampling_frequency=samplerate,
                                  frame_length=config.audio_processing.frame_length,
@@ -409,7 +433,6 @@ def audio2mfcc_df(signal: np.ndarray, samplerate: int, config: Config) -> pd.Dat
                                  fft_length=512,
                                  num_cepstral=config.audio_processing.num_cepstral)
 
-    # Compute the time index
     index = np.arange(0,
                       (len(mfcc) - 0.5) * config.audio_processing.frame_stride,
                       config.audio_processing.frame_stride) + config.audio_processing.frame_length
@@ -431,9 +454,7 @@ def create_ogg_cache(ogg_path, config: Config, order=(0, 1)):
 def create_ogg_caches(ogg_paths, config: Config):
     total = len(ogg_paths)
     inputs = ((s, config, (i, total)) for i, s in enumerate(ogg_paths))
-    # `spawn` to sidestep POSIX fork pain: https://pythonspeed.com/articles/python-multiprocessing/
     with multiprocessing.get_context("spawn").Pool(initializer=init_worker()) as pool:
-        # pool = Pool(initializer=init_worker())
         pool.starmap(create_ogg_cache, inputs)
         pool.close()
         pool.join()
@@ -463,16 +484,13 @@ def generate_snippets(song_df: pd.DataFrame, config: Config):
     window = config.beat_preprocessing.snippet_window_length
     skip = config.beat_preprocessing.snippet_window_skip
 
-    # Check if at least 1 window is possible
     if ln < window:
         return None
 
-    # Name and difficulty information is contained in the grouping operation
     indexes_to_drop = ['name', 'difficulty']
     song_df = song_df.reset_index(level=indexes_to_drop).drop(columns=indexes_to_drop)
 
     for s in range(0, ln, skip):
-        # Make sure the dataset contains ends of the songs
         if s + window > ln:
             stack.append(song_df.iloc[-window:])
         else:
@@ -484,10 +502,5 @@ def generate_snippets(song_df: pd.DataFrame, config: Config):
 
 if __name__ == '__main__':
     config = Config()
-    # config.audio_processing.use_cache = False
-    df1 = process_song_folder('../data/new_dataformat/3207', config=config)
+    df1 = process_song_folder('/home/jetskipenguin/Python/DeepSaber/data/human_beatmaps/new_dataformat/292', config=config)
     print(df1.columns)
-
-    df1 = process_song_folder('../data/new_dataformat/3db2', config=config)
-
-    print(df1)
