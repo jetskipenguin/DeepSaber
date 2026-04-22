@@ -300,8 +300,12 @@ def process_song_folder(folder, config: Config, order=(0, 1)):
 
     # Load Info.dat to map difficulties to actual filenames
     difficulty_mapping = {}
-    with open(info_path, 'r', encoding='utf-8') as f:
-        info_data = json.load(f)
+    try:
+        with open(info_path, 'r', encoding='utf-8') as f:
+            info_data = json.load(f)
+    except UnicodeDecodeError:
+        print(f'\n\t[process | process_song_folder] Skipped file {folder_name}  |  {folder}:\n\t\tUnicodeDecodeError while reading info file', file=stderr)
+        return None
         
     # Handle V2 and V3 Info structures
     beatmap_sets = info_data.get('_difficultyBeatmapSets') or info_data.get('difficultyBeatmapSets') or []
