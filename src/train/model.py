@@ -221,7 +221,9 @@ def baseline_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
     x = forgiving_concatenate(inputs=per_stream_list, axis=-1, name=names.__next__(), )
 
     for i in range(config.training.lstm_repetition):
-        x = layers.LSTM(basic_block_size, return_sequences=True, stateful=stateful, name=names.__next__(), )(x)
+        x = layers.RNN(layers.LSTMCell(basic_block_size, 
+                                       kernel_regularizer=keras.regularizers.l2(config.training.l2_regularization)),
+                       return_sequences=True, stateful=stateful, name=names.__next__())(x)
 
     outputs = {}
     loss = {}
@@ -272,9 +274,11 @@ def ddc_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
     x = forgiving_concatenate(inputs=per_stream_list, axis=-1, name=names.__next__(), )
 
     for i in range(config.training.lstm_repetition):
-        x = layers.LSTM(basic_block_size, return_sequences=True, stateful=stateful, name=names.__next__(), )(x)
+        x = layers.RNN(layers.LSTMCell(basic_block_size, 
+                                       kernel_regularizer=keras.regularizers.l2(config.training.l2_regularization)),
+                       return_sequences=True, stateful=stateful, name=names.__next__())(x)
         x = layers.Dropout(dropout)(x)
-
+ 
     outputs = {}
     loss = {}
     for col in seq.y_cols:
