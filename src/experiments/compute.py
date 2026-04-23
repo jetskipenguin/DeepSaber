@@ -5,7 +5,7 @@ import multiprocessing
 import random
 from typing import Dict, Optional
 
-import kerastuner as kt
+import keras_tuner as kt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -15,6 +15,7 @@ from train.callbacks import create_callbacks
 from train.model import get_architecture_fn
 from train.sequence import BeatmapSequence
 from utils.types import Timer, Config
+from tensorflow.keras.callbacks import EarlyStopping
 
 
 def eval_hyperparams(base_folder, timer, hyper_params: Dict, return_list,
@@ -76,6 +77,12 @@ def get_config_model_loss(train, val, test, config, return_list, hp: Optional[kt
         model = model(hp, use_avs_model=True)
 
     callbacks = create_callbacks(train_seq, config)
+
+    early_stop = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+    if isinstance(callbacks, list):
+        callbacks.append(early_stop)
+    else:
+        callbacks = [callbacks, early_stop]
 
     history = model.fit(train_seq,
                         validation_data=val_seq,
