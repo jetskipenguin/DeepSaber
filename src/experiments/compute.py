@@ -54,7 +54,7 @@ def eval_config(csv_file, timer, return_list, train, val, test, config, test_nam
 
     if csv_file.exists():
         df = pd.read_csv(csv_file, index_col=0)
-        df = df.append(series)
+        df = pd.concat([df, series.to_frame().T], ignore_index=False)
     else:
         df = pd.DataFrame([series, ])
     df.index.name = test_name
