@@ -84,7 +84,7 @@ def get_config_model_loss(train, val, test, config, return_list, hp: Optional[kt
                         verbose=2,
                         workers=10,
                         max_queue_size=16,
-                        use_multiprocessing=False,
+                        use_multiprocessing=True,
                         )
     eval_metrics = model.evaluate(test_seq, workers=10, return_dict=True, verbose=0)
 
