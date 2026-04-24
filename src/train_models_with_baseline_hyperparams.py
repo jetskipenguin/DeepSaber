@@ -81,7 +81,7 @@ def main():
             train_seq,
             validation_data=val_seq,
             callbacks=callbacks,
-            epochs=1, #TODO: Temporary for smoke test  
+            epochs=150,
             verbose=2,
             workers=10,
             max_queue_size=16,
