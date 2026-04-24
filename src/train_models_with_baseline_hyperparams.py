@@ -16,8 +16,6 @@ def main():
     base_folder, return_list, test, timer, train, val = init_test()
     
     models_to_train = [
-        ModelType.BASELINE, 
-        ModelType.DDC, 
         ModelType.TUNE_MLSTM
     ]
 
@@ -63,7 +61,7 @@ def main():
                 hp.Fixed(param, value=val_hp)
 
             # MLSTM returns a builder function that requires the hp object
-            model = get_architecture_fn(config)(train_seq, False, config)(hp)
+            model = get_architecture_fn(config)(train_seq, False, config)(hp, use_avs_model=True)
         else:
             print(f"Building standard {model_type}...")
             # Baseline and DDC build directly from the config
