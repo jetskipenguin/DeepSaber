@@ -575,10 +575,13 @@ def multi_lstm_tuning_model(seq: BeatmapSequence, stateful, config: Config) -> M
             connections = min(hp.Int(f'connections_{i}', 1, 3), len(last_layer))
             dropout = hp.Float(f'dropout_{i}', 0, 0.5)
             for width_i in range(hp.Int(f'width_{i}', 1, 16)):
-                t = layers.LSTM(depth, return_sequences=True,
-                                name=f'lstm{i:03}_{width_i:03}_{layer_names.__next__()}',
-                                stateful=stateful, )(
+                # Bypassing the buggy LSTM wrapper
+                t = layers.RNN(layers.LSTMCell(depth), 
+                               return_sequences=True,
+                               name=f'lstm{i:03}_{width_i:03}_{layer_names.__next__()}',
+                               stateful=stateful)(
                     forgiving_concatenate(random.sample(last_layer, connections), name=layer_names.__next__()))
+                
                 t = layers.BatchNormalization(name=layer_names.__next__())(t)
                 t = layers.Dropout(dropout, name=layer_names.__next__())(t)
                 outs.append(t)
