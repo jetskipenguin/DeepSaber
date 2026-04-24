@@ -13,7 +13,7 @@ def create_callbacks(train_seq: BeatmapSequence, config: Config):
         # tf.keras.callbacks.TensorBoard(logdir, histogram_freq=0),    # Slows auto search. Enable if experimenting by hand.
         # ForgivingEarlyStopping(monitor='val_avs_dist', max_forgiveness=0.003, patience=8, verbose=0, mode='auto',
         #                        baseline=None, restore_best_weights=True),
-        tf.keras.callbacks.EarlyStopping(monitor='val_avs_dist', min_delta=0.001, patience=7, verbose=0, mode='auto',
+        tf.keras.callbacks.EarlyStopping(monitor='val_avs_dist', min_delta=0.0001, patience=7, verbose=0, mode='auto',
                                   baseline=None, restore_best_weights=True),
         OnEpochEnd([train_seq]),
     ]
