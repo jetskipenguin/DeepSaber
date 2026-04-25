@@ -254,10 +254,12 @@ def generate_action_embeddings():
         #     right_translation = '', right_dy, right_dx, right_drotation
         #     add_valid_translations_two_hand(lines, translation, right_translation)
 
+    
         with open(path, 'w') as wf:
             wf.write('\n'.join(lines) + '\n')
-
-        create_analogies(storage_folder / 'beat_analogies.txt')
+            
+    print("Generating analogies...")
+    create_analogies(storage_folder / 'beat_analogies.txt')
 
     def create_train_model(corpus_file, model_type: str='fasttext', **kwargs):
         kwargs = {key: int(val) for key, val in kwargs.items()}
