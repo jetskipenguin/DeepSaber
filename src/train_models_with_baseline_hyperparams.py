@@ -2,6 +2,8 @@ import os
 import tensorflow as tf
 import keras_tuner as kt
 
+from process.api import create_song_list, generate_datasets, generate_datasets
+
 os.environ['AUTOGRAPH_VERBOSITY'] = '5'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -14,6 +16,11 @@ from utils.types import Config, ModelType
 def main():
     # Initialize data and folders
     base_folder, return_list, test, timer, train, val = init_test()
+    # Regenerate datasets to match current FastText embedding dimensions
+    config = Config()
+    song_folders = create_song_list(config.dataset.beat_maps_folder)
+    config.audio_processing.use_cache = False  # Force MFCC recomputation
+    generate_datasets(song_folders, config)
     
     models_to_train = [
         ModelType.BASELINE,
