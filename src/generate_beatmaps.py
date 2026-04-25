@@ -11,6 +11,7 @@ from utils.types import Config, Timer
 def main():
     timer = Timer()
     config = Config()
+    config.audio_processing.use_cache = False # Assumes these songs are not present in cache
     base_folder = config.base_data_folder
 
     # 1. Define Paths
