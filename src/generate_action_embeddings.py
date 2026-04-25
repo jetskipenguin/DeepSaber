@@ -16,7 +16,7 @@ def load_datasets(storage_folder) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFr
             ['train', 'val', 'test']]
 
 def generate_action_embeddings():
-    storage_folder = Path('../../data/new_datasets')
+    storage_folder = Path('../data/new_datasets')
     train, val, test = load_datasets(storage_folder)
 
     def create_sentence(x):
@@ -257,7 +257,7 @@ def generate_action_embeddings():
     
         with open(path, 'w') as wf:
             wf.write('\n'.join(lines) + '\n')
-            
+
     print("Generating analogies...")
     create_analogies(storage_folder / 'beat_analogies.txt')
 
