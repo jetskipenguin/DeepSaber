@@ -85,7 +85,7 @@ def df_post_processing(df, config):
         word_id_dict = create_word_mapping(action_model)
         df['word_id'] = df['word'].map(lambda word: word_id_dict.get(word, 1))  # 0: MASK, 1: UNK
     else:
-        logging.warning(f'Could not find action word model [{config.dataset.action_word_model_path}], '
+        logging.error(f'Could not find action word model [{config.dataset.action_word_model_path}], '
                         f'skipping word_vec and word_id.')
         df['word_vec'] = 0
         df['word_id'] = 0
