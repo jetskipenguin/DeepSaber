@@ -43,6 +43,7 @@ def main():
         config.training.label_smoothing = 0.1
         config.training.mixup_alpha = 0.0
         config.training.l2_regularization = 1e-5
+        print(config.dataset)
 
         train_seq = BeatmapSequence(df=train, is_train=True, config=config)
         val_seq = BeatmapSequence(df=val, is_train=False, config=config)
