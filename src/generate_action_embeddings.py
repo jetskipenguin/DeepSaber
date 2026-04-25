@@ -263,7 +263,7 @@ def generate_action_embeddings():
 
     def create_train_model(corpus_file, model_type: str='fasttext', **kwargs):
         kwargs = {key: int(val) for key, val in kwargs.items()}
-        kwargs['size'] = 2 ** kwargs['size']
+        kwargs['vector_size'] = 2 ** kwargs['vector_size']
         workers = 12
         # change `workers` to suit our machine thread count
         if model_type.lower() == 'fasttext':
@@ -298,7 +298,7 @@ def generate_action_embeddings():
     # Train Word2Vec
     bool_ = (0.1, 1.9)
     pbounds = {
-        'size': (4, 8),         # log int
+        'vector_size': (4, 8),         # log int
         'window': (1, 7),       # int
         'epochs': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
         'sg': bool_,            # bool : skip-gram if `sg=1`, otherwise CBOW.
@@ -321,7 +321,7 @@ def generate_action_embeddings():
     # Train FastText
     bool_ = (0.1, 1.9)
     pbounds = {
-        'size': (4, 8),         # log int
+        'vector_size': (4, 8),         # log int
         'window': (1, 7),       # int
         'epochs': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
         'sg': bool_,            # bool : skip-gram if `sg=1`, otherwise CBOW.
