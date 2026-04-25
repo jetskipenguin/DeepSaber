@@ -287,7 +287,7 @@ def generate_action_embeddings():
 
     accuracies = []
     for size, _ in product(range(4, 9), range(2)):
-        acc = create_eval_function(storage_folder / 'train_text.cor', 'word2vec')(epochs=0, vector_size=size)
+        acc = create_eval_function(storage_folder / 'train_text.cor', 'word2vec')(epochs=5, vector_size=size)
         accuracies.append(acc)
 
     accuracy = {}
