@@ -21,7 +21,7 @@ def main():
     
     # Define where your raw songs are and where the mapped JSONs should go
     input_folder = base_folder / 'evaluation_dataset' / 'unmapped_songs' 
-    output_folder = base_folder / 'testing' / 'generated_songs'
+    output_folder = base_folder / 'generated_beatmaps'
 
     if not model_path.exists():
         print(f"Error: Could not find model at {model_path}")
