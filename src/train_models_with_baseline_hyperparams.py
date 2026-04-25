@@ -6,23 +6,18 @@ os.environ['AUTOGRAPH_VERBOSITY'] = '5'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from experiments.compute import init_test
-from process.api import create_song_list, generate_datasets
 from train.callbacks import create_callbacks
 from train.model import get_architecture_fn, save_model
 from train.sequence import BeatmapSequence
 from utils.types import Config, ModelType
 
 def main():
-    # Regenerate datasets to match current FastText embedding dimensions
-    config = Config()
-    song_folders = create_song_list(config.dataset.beat_maps_folder)
-    config.audio_processing.use_cache = False  # Force MFCC recomputation
-    generate_datasets(song_folders, config)
-    
     # Initialize data and folders
     base_folder, return_list, test, timer, train, val = init_test()
     
     models_to_train = [
+        ModelType.BASELINE,
+        ModelType.DDC,
         ModelType.TUNE_MLSTM
     ]
 
