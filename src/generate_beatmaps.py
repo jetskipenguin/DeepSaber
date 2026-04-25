@@ -13,22 +13,12 @@ def main():
     timer = Timer()
     config = Config()
     base_folder = config.base_data_folder
-    config.training.model_type = ModelType.TUNE_MLSTM
-    config.training.model_size = 256
-    config.training.batch_size = 64
-    config.training.cnn_repetition = 2
-    config.training.lstm_repetition = 2
-    config.training.dense_repetition = 1
-    config.training.dropout = 0.3
-    config.training.initial_learning_rate = 0.001
-    config.training.label_smoothing = 0.1
-    config.training.mixup_alpha = 0.0
-    config.training.l2_regularization = 1e-5
+    config.training.model_type = ModelType.DDC
 
     # 1. Define Paths
     # Change 'static_ddc' to whichever model you want to evaluate 
     # (e.g., 'static_baseline', 'static_tune_mlstm', 'best_tune_clstm')
-    model_name = 'static_tune_mlstm' 
+    model_name = 'static_ddc' 
     model_path = base_folder / 'checkpoints' / model_name / 'stateful_model.keras'
     
     # Define where your raw songs are and where the mapped JSONs should go
