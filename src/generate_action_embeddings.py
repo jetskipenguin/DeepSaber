@@ -315,7 +315,7 @@ def generate_action_embeddings():
 
     word2vec_optimizer.maximize(
         init_points=2,
-        epochs=3,
+        n_iter=3,
     )
 
     # Train FastText
@@ -342,7 +342,7 @@ def generate_action_embeddings():
 
     fasttext_optimizer.maximize(
         init_points=2,
-        epochs=3,
+        n_iter=3,
     )
 
     rdf = pd.DataFrame(word2vec_optimizer.res)
