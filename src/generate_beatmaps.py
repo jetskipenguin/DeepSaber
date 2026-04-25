@@ -7,11 +7,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from predict.api import generate_complete_beatmaps
 from train.metrics import Perplexity
 from utils.types import Config, Timer
+from process.api import recalculate_mfcc_df_cache
 
 def main():
     timer = Timer()
     config = Config()
-    config.audio_processing.use_cache = False # Assumes these songs are not present in cache
     base_folder = config.base_data_folder
 
     # 1. Define Paths
@@ -58,6 +58,11 @@ def main():
 
     for song_folder in dirs:
         print(f"Working on {song_folder.name}...")
+
+        config.audio_processing.use_cache = False
+
+        # Compute the audio features (MFCCs) and save them to a temporary cache
+        recalculate_mfcc_df_cache([song_folder], config)
         
         # The API handles audio processing, feature extraction, and JSON writing
         generate_complete_beatmaps(song_folder, output_folder, stateful_model, config)
