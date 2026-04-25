@@ -14,6 +14,16 @@ def main():
     config = Config()
     base_folder = config.base_data_folder
     config.training.model_type = ModelType.TUNE_MLSTM
+    config.training.model_size = 256
+    config.training.batch_size = 64
+    config.training.cnn_repetition = 2
+    config.training.lstm_repetition = 2
+    config.training.dense_repetition = 1
+    config.training.dropout = 0.3
+    config.training.initial_learning_rate = 0.001
+    config.training.label_smoothing = 0.1
+    config.training.mixup_alpha = 0.0
+    config.training.l2_regularization = 1e-5
 
     # 1. Define Paths
     # Change 'static_ddc' to whichever model you want to evaluate 
