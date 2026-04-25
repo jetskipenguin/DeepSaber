@@ -374,3 +374,6 @@ def generate_action_embeddings():
 
         # check shape
         logging.info(loaded_model['R125_R217_R000_LLLL'].shape)   # fabricated word
+
+if __name__ == "__main__":
+    generate_action_embeddings()
