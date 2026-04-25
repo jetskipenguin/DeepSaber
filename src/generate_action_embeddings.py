@@ -287,7 +287,7 @@ def generate_action_embeddings():
 
     accuracies = []
     for size, _ in product(range(4, 9), range(2)):
-        acc = create_eval_function(storage_folder / 'train_text.cor', 'word2vec')(n_iter=0, size=size)
+        acc = create_eval_function(storage_folder / 'train_text.cor', 'word2vec')(epochs=0, size=size)
         accuracies.append(acc)
 
     accuracy = {}
@@ -300,7 +300,7 @@ def generate_action_embeddings():
     pbounds = {
         'size': (4, 8),         # log int
         'window': (1, 7),       # int
-        'n_iter': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
+        'epochs': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
         'sg': bool_,            # bool : skip-gram if `sg=1`, otherwise CBOW.
         'hs': bool_,            # bool : If 1, hierarchical softmax will be used for model training.
                                 #        If set to 0, and `negative` is non-zero, negative sampling will be used.
@@ -315,7 +315,7 @@ def generate_action_embeddings():
 
     word2vec_optimizer.maximize(
         init_points=2,
-        n_iter=3,
+        epochs=3,
     )
 
     # Train FastText
@@ -323,7 +323,7 @@ def generate_action_embeddings():
     pbounds = {
         'size': (4, 8),         # log int
         'window': (1, 7),       # int
-        'n_iter': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
+        'epochs': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
         'sg': bool_,            # bool : skip-gram if `sg=1`, otherwise CBOW.
         'hs': bool_,            # bool : If 1, hierarchical softmax will be used for model training.
                                 #        If set to 0, and `negative` is non-zero, negative sampling will be used.
@@ -342,7 +342,7 @@ def generate_action_embeddings():
 
     fasttext_optimizer.maximize(
         init_points=2,
-        n_iter=3,
+        epochs=3,
     )
 
     rdf = pd.DataFrame(word2vec_optimizer.res)
