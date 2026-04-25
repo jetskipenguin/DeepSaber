@@ -315,7 +315,7 @@ def generate_action_embeddings():
 
     word2vec_optimizer.maximize(
         init_points=2,
-        n_iter=3,
+        n_iter=6,
     )
 
     # Train FastText
@@ -342,7 +342,7 @@ def generate_action_embeddings():
 
     fasttext_optimizer.maximize(
         init_points=2,
-        n_iter=3,
+        n_iter=6,
     )
 
     rdf = pd.DataFrame(word2vec_optimizer.res)
@@ -350,6 +350,48 @@ def generate_action_embeddings():
 
     rdf = pd.DataFrame(fasttext_optimizer.res)
     accuracy['search fasttext'], fasttext_params = rdf.loc[rdf['target'].idxmax()].to_list()
+
+    word2vec_params = {
+        'cbow_mean': True,
+        'hs': False,
+        'epochs': 3,
+        'sg': False,
+        'vector_size': 5,
+        'window': 1,
+    }
+
+    # ngrams
+    fasttext_params = {
+        'cbow_mean': True,
+        'hs': False, 
+        'epochs': 3,
+        'max_n': 3,
+        'min_n': 2,
+        'sg': False,
+        'vector_size': 9,
+        'window': 1,
+        'word_ngrams': 1, 
+    }   
+
+    # without ngrams
+    fasttext_params_no_ngrams = {
+        'cbow_mean': True,
+        'hs': False,
+        'epochs': 3,
+        'max_n': 3,
+        'min_n': 2,
+        'sg': False,
+        'vector_size': 8,
+        'window': 1,
+        'word_ngrams': 0 
+    }   
+
+
+    model = create_train_model(storage_folder / 'train_text.cor', 'word2vec', **word2vec_params)
+    accuracy['good word2vec'] = model.wv.evaluate_word_analogies(storage_folder / 'beat_analogies.txt')[0]
+
+    model = create_train_model(storage_folder / 'train_text.cor', 'fasttext', **fasttext_params)
+    accuracy['good fasttext'] = model.wv.evaluate_word_analogies(storage_folder / 'beat_analogies.txt')[0]
 
     # Performance on train set
     train_perf = pd.DataFrame(data=accuracy.values(), index=accuracy.keys(), columns=['best top1 accuracy [%]']).sort_values('best top1 accuracy [%]') * 100
