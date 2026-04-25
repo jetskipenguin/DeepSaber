@@ -205,6 +205,7 @@ def forgiving_concatenate(inputs, axis=-1, **kwargs):
 
 
 def baseline_model(seq: BeatmapSequence, stateful, config: Config) -> Model:
+    print("DEBUG SHAPES:", seq.shapes['prev_word_vec'], seq.shapes['word_vec'])
     batch_size = config.generation.batch_size if stateful else None
     names = name_generator('layer')
 
@@ -575,7 +576,6 @@ def multi_lstm_tuning_model(seq: BeatmapSequence, stateful, config: Config) -> M
             connections = min(hp.Int(f'connections_{i}', 1, 3), len(last_layer))
             dropout = hp.Float(f'dropout_{i}', 0, 0.5)
             for width_i in range(hp.Int(f'width_{i}', 1, 16)):
-                # Bypassing the buggy LSTM wrapper
                 t = layers.RNN(layers.LSTMCell(depth), 
                                return_sequences=True,
                                name=f'lstm{i:03}_{width_i:03}_{layer_names.__next__()}',
