@@ -259,121 +259,121 @@ def generate_action_embeddings():
 
         create_analogies(storage_folder / 'beat_analogies.txt')
 
-        def create_train_model(corpus_file, model_type: str='fasttext', **kwargs):
-            kwargs = {key: int(val) for key, val in kwargs.items()}
-            kwargs['size'] = 2 ** kwargs['size']
-            workers = 12
-            # change `workers` to suit our machine thread count
-            if model_type.lower() == 'fasttext':
-                model = gensim.models.FastText(corpus_file=str(corpus_file), **kwargs, workers=workers)
-            else:
-                model = gensim.models.Word2Vec(corpus_file=str(corpus_file), **kwargs, workers=workers)
-            
-            return model
-
-        def create_eval_function(corpus_file: Path, model_type: str):
-            def eval_model(**kwargs):
-                model = create_train_model(corpus_file, model_type, **kwargs)
-
-                res = model.wv.evaluate_word_analogies(storage_folder / 'beat_analogies.txt')
-
-                return res[0]
-            
-            return eval_model
+    def create_train_model(corpus_file, model_type: str='fasttext', **kwargs):
+        kwargs = {key: int(val) for key, val in kwargs.items()}
+        kwargs['size'] = 2 ** kwargs['size']
+        workers = 12
+        # change `workers` to suit our machine thread count
+        if model_type.lower() == 'fasttext':
+            model = gensim.models.FastText(corpus_file=str(corpus_file), **kwargs, workers=workers)
+        else:
+            model = gensim.models.Word2Vec(corpus_file=str(corpus_file), **kwargs, workers=workers)
         
-        from scipy import stats
+        return model
 
-        accuracies = []
-        for size, _ in product(range(4, 9), range(2)):
-            acc = create_eval_function(storage_folder / 'train_text.cor', 'word2vec')(iter=0, size=size)
-            accuracies.append(acc)
+    def create_eval_function(corpus_file: Path, model_type: str):
+        def eval_model(**kwargs):
+            model = create_train_model(corpus_file, model_type, **kwargs)
 
-        accuracy = {}
-        acc_desc = stats.describe(accuracies)
-        accuracy['random'] = acc_desc.minmax[1]  # get maximum
-        print(f'{acc_desc.mean} +-{2 * acc_desc.variance}')
+            res = model.wv.evaluate_word_analogies(storage_folder / 'beat_analogies.txt')
 
-        # Train Word2Vec
-        bool_ = (0.1, 1.9)
-        pbounds = {
-            'size': (4, 8),         # log int
-            'window': (1, 7),       # int
-            'iter': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
-            'sg': bool_,            # bool : skip-gram if `sg=1`, otherwise CBOW.
-            'hs': bool_,            # bool : If 1, hierarchical softmax will be used for model training.
-                                    #        If set to 0, and `negative` is non-zero, negative sampling will be used.
-            'cbow_mean': bool_,     # bool : If 0, use the sum of the context word vectors. If 1, use the mean, only applies when cbow is used.
-        }
+            return res[0]
+        
+        return eval_model
+        
+    from scipy import stats
 
-        word2vec_optimizer = BayesianOptimization(
-            f=create_eval_function(storage_folder / 'train_text.cor', 'word2vec'),
-            pbounds=pbounds,
-            random_state=1,
-        )
+    accuracies = []
+    for size, _ in product(range(4, 9), range(2)):
+        acc = create_eval_function(storage_folder / 'train_text.cor', 'word2vec')(iter=0, size=size)
+        accuracies.append(acc)
 
-        word2vec_optimizer.maximize(
-            init_points=2,
-            n_iter=3,
-        )
+    accuracy = {}
+    acc_desc = stats.describe(accuracies)
+    accuracy['random'] = acc_desc.minmax[1]  # get maximum
+    print(f'{acc_desc.mean} +-{2 * acc_desc.variance}')
 
-        # Train FastText
-        bool_ = (0.1, 1.9)
-        pbounds = {
-            'size': (4, 8),         # log int
-            'window': (1, 7),       # int
-            'iter': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
-            'sg': bool_,            # bool : skip-gram if `sg=1`, otherwise CBOW.
-            'hs': bool_,            # bool : If 1, hierarchical softmax will be used for model training.
-                                    #        If set to 0, and `negative` is non-zero, negative sampling will be used.
-            # 'sample': (0, 1e-5),   # float: The threshold for configuring which higher-frequency words are randomly downsampled,
-            # 'negative': (0, 20),   # int  : If > 0, negative sampling will be used, the int for negative specifies how many "noise words"
-            'cbow_mean': bool_,     # bool : If 0, use the sum of the context word vectors. If 1, use the mean, only applies when cbow is used.
-            'min_n': (2, 5),        # int  : Minimum length of char n-grams to be used for training word representations.
-            'max_n': (3, 9),        # int  : Max length of char ngrams to be used for training word representations. Set `max_n` to be lesser than `min_n` to avoid char ngrams being used.
-            'word_ngrams': bool_,   # bool : If 1, uses enriches word vectors with subword(n-grams) information.
-                                    #        If 0, this is equivalent to :class:`~gensim.models.word2vec.Word2Vec`.
-        }
+    # Train Word2Vec
+    bool_ = (0.1, 1.9)
+    pbounds = {
+        'size': (4, 8),         # log int
+        'window': (1, 7),       # int
+        'iter': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
+        'sg': bool_,            # bool : skip-gram if `sg=1`, otherwise CBOW.
+        'hs': bool_,            # bool : If 1, hierarchical softmax will be used for model training.
+                                #        If set to 0, and `negative` is non-zero, negative sampling will be used.
+        'cbow_mean': bool_,     # bool : If 0, use the sum of the context word vectors. If 1, use the mean, only applies when cbow is used.
+    }
 
-        fasttext_optimizer = BayesianOptimization(
-            f=create_eval_function(storage_folder / 'train_text.cor', 'fasttext'),
-            pbounds=pbounds,
-            random_state=1,
-        )
+    word2vec_optimizer = BayesianOptimization(
+        f=create_eval_function(storage_folder / 'train_text.cor', 'word2vec'),
+        pbounds=pbounds,
+        random_state=1,
+    )
 
-        fasttext_optimizer.maximize(
-            init_points=2,
-            n_iter=3,
-        )
+    word2vec_optimizer.maximize(
+        init_points=2,
+        n_iter=3,
+    )
 
-        rdf = pd.DataFrame(word2vec_optimizer.res)
-        accuracy['search word2vec'], wordvec_params = rdf.loc[rdf['target'].idxmax()].to_list()
+    # Train FastText
+    bool_ = (0.1, 1.9)
+    pbounds = {
+        'size': (4, 8),         # log int
+        'window': (1, 7),       # int
+        'iter': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
+        'sg': bool_,            # bool : skip-gram if `sg=1`, otherwise CBOW.
+        'hs': bool_,            # bool : If 1, hierarchical softmax will be used for model training.
+                                #        If set to 0, and `negative` is non-zero, negative sampling will be used.
+        # 'sample': (0, 1e-5),   # float: The threshold for configuring which higher-frequency words are randomly downsampled,
+        # 'negative': (0, 20),   # int  : If > 0, negative sampling will be used, the int for negative specifies how many "noise words"
+        'cbow_mean': bool_,     # bool : If 0, use the sum of the context word vectors. If 1, use the mean, only applies when cbow is used.
+        'min_n': (2, 5),        # int  : Minimum length of char n-grams to be used for training word representations.
+        'max_n': (3, 9),        # int  : Max length of char ngrams to be used for training word representations. Set `max_n` to be lesser than `min_n` to avoid char ngrams being used.
+        'word_ngrams': bool_,   # bool : If 1, uses enriches word vectors with subword(n-grams) information.
+                                #        If 0, this is equivalent to :class:`~gensim.models.word2vec.Word2Vec`.
+    }
 
-        rdf = pd.DataFrame(fasttext_optimizer.res)
-        accuracy['search fasttext'], fasttext_params = rdf.loc[rdf['target'].idxmax()].to_list()
+    fasttext_optimizer = BayesianOptimization(
+        f=create_eval_function(storage_folder / 'train_text.cor', 'fasttext'),
+        pbounds=pbounds,
+        random_state=1,
+    )
 
-        # Performance on train set
-        train_perf = pd.DataFrame(data=accuracy.values(), index=accuracy.keys(), columns=['best top1 accuracy [%]']).sort_values('best top1 accuracy [%]') * 100
-        logging.info(f"Train Performance  Head:\n{train_perf.head().to_string()}")
+    fasttext_optimizer.maximize(
+        init_points=2,
+        n_iter=3,
+    )
 
-        # Performance on val set
-        model = create_train_model(storage_folder / 'train_text.cor', 'fasttext', **fasttext_params)
-        train_accuracy = model.wv.evaluate_word_analogies(storage_folder / 'beat_analogies.txt')[0]
+    rdf = pd.DataFrame(word2vec_optimizer.res)
+    accuracy['search word2vec'], wordvec_params = rdf.loc[rdf['target'].idxmax()].to_list()
 
-        val_accuracy = create_eval_function(storage_folder / 'val_text.cor', 'fasttext')(**fasttext_params)
-        print(f'New model achieved {train_accuracy * 100:7.4} % accuracy on the train data.')
-        print(f'New model achieved {val_accuracy * 100:7.4} % accuracy on the validation data.')
+    rdf = pd.DataFrame(fasttext_optimizer.res)
+    accuracy['search fasttext'], fasttext_params = rdf.loc[rdf['target'].idxmax()].to_list()
 
-        # Save best model
-        model.wv.save_word2vec_format(str(storage_folder / 'word2vec.model'), binary=False)
+    # Performance on train set
+    train_perf = pd.DataFrame(data=accuracy.values(), index=accuracy.keys(), columns=['best top1 accuracy [%]']).sort_values('best top1 accuracy [%]') * 100
+    logging.info(f"Train Performance  Head:\n{train_perf.head().to_string()}")
 
-        model.wv.save(str(storage_folder / 'fasttext.model'))
+    # Performance on val set
+    model = create_train_model(storage_folder / 'train_text.cor', 'fasttext', **fasttext_params)
+    train_accuracy = model.wv.evaluate_word_analogies(storage_folder / 'beat_analogies.txt')[0]
 
-        # test load
-        gensim.models.KeyedVectors.load_word2vec_format(str(storage_folder / 'word2vec.model'))
-        loaded_model = gensim.models.KeyedVectors.load(str(storage_folder / 'fasttext.model'))
+    val_accuracy = create_eval_function(storage_folder / 'val_text.cor', 'fasttext')(**fasttext_params)
+    print(f'New model achieved {train_accuracy * 100:7.4} % accuracy on the train data.')
+    print(f'New model achieved {val_accuracy * 100:7.4} % accuracy on the validation data.')
 
-        # check shape
-        logging.info(loaded_model['R125_R217_R000_LLLL'].shape)   # fabricated word
+    # Save best model
+    model.wv.save_word2vec_format(str(storage_folder / 'word2vec.model'), binary=False)
+
+    model.wv.save(str(storage_folder / 'fasttext.model'))
+
+    # test load
+    gensim.models.KeyedVectors.load_word2vec_format(str(storage_folder / 'word2vec.model'))
+    loaded_model = gensim.models.KeyedVectors.load(str(storage_folder / 'fasttext.model'))
+
+    # check shape
+    logging.info(loaded_model['R125_R217_R000_LLLL'].shape)   # fabricated word
 
 if __name__ == "__main__":
     generate_action_embeddings()
