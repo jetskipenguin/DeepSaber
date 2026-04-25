@@ -300,7 +300,7 @@ def generate_action_embeddings():
     pbounds = {
         'size': (4, 8),         # log int
         'window': (1, 7),       # int
-        'iter': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
+        'n_iter': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
         'sg': bool_,            # bool : skip-gram if `sg=1`, otherwise CBOW.
         'hs': bool_,            # bool : If 1, hierarchical softmax will be used for model training.
                                 #        If set to 0, and `negative` is non-zero, negative sampling will be used.
@@ -323,7 +323,7 @@ def generate_action_embeddings():
     pbounds = {
         'size': (4, 8),         # log int
         'window': (1, 7),       # int
-        'iter': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
+        'n_iter': (1.1, 20),      # int  : Number of iterations (epochs) over the corpus.
         'sg': bool_,            # bool : skip-gram if `sg=1`, otherwise CBOW.
         'hs': bool_,            # bool : If 1, hierarchical softmax will be used for model training.
                                 #        If set to 0, and `negative` is non-zero, negative sampling will be used.
@@ -332,8 +332,6 @@ def generate_action_embeddings():
         'cbow_mean': bool_,     # bool : If 0, use the sum of the context word vectors. If 1, use the mean, only applies when cbow is used.
         'min_n': (2, 5),        # int  : Minimum length of char n-grams to be used for training word representations.
         'max_n': (3, 9),        # int  : Max length of char ngrams to be used for training word representations. Set `max_n` to be lesser than `min_n` to avoid char ngrams being used.
-        'word_ngrams': bool_,   # bool : If 1, uses enriches word vectors with subword(n-grams) information.
-                                #        If 0, this is equivalent to :class:`~gensim.models.word2vec.Word2Vec`.
     }
 
     fasttext_optimizer = BayesianOptimization(
