@@ -16,11 +16,6 @@ from utils.types import Config, ModelType
 def main():
     # Initialize data and folders
     base_folder, return_list, test, timer, train, val = init_test()
-    # Regenerate datasets to match current FastText embedding dimensions
-    config = Config()
-    song_folders = create_song_list(config.dataset.beat_maps_folder)
-    config.audio_processing.use_cache = False  # Force MFCC recomputation
-    generate_datasets(song_folders, config)
     
     models_to_train = [
         ModelType.BASELINE,
