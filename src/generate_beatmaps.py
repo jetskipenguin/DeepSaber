@@ -6,13 +6,14 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from predict.api import generate_complete_beatmaps
 from train.metrics import Perplexity
-from utils.types import Config, Timer
+from utils.types import Config, ModelType, Timer
 from process.api import recalculate_mfcc_df_cache
 
 def main():
     timer = Timer()
     config = Config()
     base_folder = config.base_data_folder
+    config.training.model_type = ModelType.TUNE_MLSTM
 
     # 1. Define Paths
     # Change 'static_ddc' to whichever model you want to evaluate 
