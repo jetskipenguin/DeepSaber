@@ -82,7 +82,7 @@ def generate_beatmap(beatmap_df: pd.DataFrame, seq: BeatmapSequence, stateful_mo
         # Experiment with moving temperature based on AVD distance. Needs further research
         # temperature = responsive_temperature(seq, temperature, i)
 
-    save_velocity_hist(seq, config)
+    #save_velocity_hist(seq, config)
     beatmap_df = predictions2df(beatmap_df, seq)
     # beatmap_df = append_last_prediction(beatmap_df, most_recent)    # TODO: Remove if unnecessary
 
