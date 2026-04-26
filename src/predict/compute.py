@@ -241,6 +241,10 @@ def save_generated_beatmaps(gen_folder: Path, beatmap_dfs: Dict[str, pd.DataFram
                             word_id_dict: Dict[str, int], config):
     if len(beatmap_dfs) == 0:
         raise ValueError("No beatmaps were generated")
+    
+    # Delete existing .dat files in the gen_folder to prevent confusion
+    for existing_file in gen_folder.glob('*.dat'):
+        existing_file.unlink()
 
     for difficulty, df in beatmap_dfs.items():
         beatmap = df2beatmap(df, action_model, word_id_dict, config)
