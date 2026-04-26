@@ -239,6 +239,9 @@ def update_generated_metadata(gen_folder: Path, beatmap_folder: Path, config: Co
 def save_generated_beatmaps(gen_folder: Path, beatmap_dfs: Dict[str, pd.DataFrame],
                             action_model: gensim.models.KeyedVectors,
                             word_id_dict: Dict[str, int], config):
+    if len(beatmap_dfs) == 0:
+        raise ValueError("No beatmaps were generated")
+
     for difficulty, df in beatmap_dfs.items():
         beatmap = df2beatmap(df, action_model, word_id_dict, config)
         with open(gen_folder / f'{difficulty}.dat', 'w') as wf:
