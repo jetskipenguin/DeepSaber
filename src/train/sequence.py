@@ -85,15 +85,32 @@ class BeatmapSequence(Sequence):
         self.x_cols = set(sum([list(cols) for cols in config.training.x_groups], []))
         self.y_cols = set(sum([list(cols) for cols in config.training.y_groups], []))
 
-        self.data = {col: np.array(df[col]
-                                   .to_numpy()
-                                   .reshape(shape)
-                                   .tolist(), dtype='float32')
-                     for col in self.categorical_cols | self.regression_cols}
-
-        for col in self.data:
-            if len(self.data[col].shape) < 3:
-                self.data[col] = self.data[col].reshape(*shape, 1)
+        self.data = {}
+        for col in self.categorical_cols | self.regression_cols:
+            raw_array = df[col].to_numpy()
+            
+            # 1. Detect the true vector dimension (e.g., 512 for word_vec, 1 for basic scalars)
+            feature_dim = 1
+            for item in raw_array:
+                if isinstance(item, (np.ndarray, list)):
+                    feature_dim = len(item)
+                    break
+                    
+            # 2. Sanitize the column to remove NaN floats introduced by Pandas padding
+            clean_list = []
+            for item in raw_array:
+                if isinstance(item, (np.ndarray, list)):
+                    clean_list.append(item)
+                else:
+                    # If it's a NaN, replace with a zero-vector. If a valid scalar, wrap it.
+                    if pd.isna(item):
+                        clean_list.append(np.zeros(feature_dim, dtype='float32'))
+                    else:
+                        clean_list.append([item])
+            
+            # 3. Stack into a uniform NumPy array and apply the correct shape
+            stacked = np.stack(clean_list).astype('float32')
+            self.data[col] = stacked.reshape(*shape, feature_dim)
 
         if self.data['word_id'].max() == 0 and 'word_id' in ' '.join(self.shapes.keys()):
             logging.log(logging.ERROR, f'Using action vector space information without loaded FastText action '
