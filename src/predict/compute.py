@@ -264,6 +264,8 @@ def create_beatmap_dfs(stateful_model: Model, action_model: gensim.models.KeyedV
     config.training.batch_size = config.generation.batch_size
     output = {}
 
+    print(f"Generating beatmap for {path.name} with {len(df)} beats...")
+
     for difficulty, sub_df in df.groupby('difficulty'):
         if difficulty not in config.training.use_difficulties:
             continue
@@ -273,8 +275,9 @@ def create_beatmap_dfs(stateful_model: Model, action_model: gensim.models.KeyedV
         # beatmap_df = sub_df.copy()    # bypass the generation
         beatmap_df = generate_beatmap(sub_df.copy(), seq, stateful_model, action_model,
                                       word_id_dict, config)
+        
         stateful_model.reset_states()
-
+        print(f"\tFinished generating {difficulty}, beatmap df shape: {beatmap_df.shape}")
         output[difficulty] = beatmap_df
     return output
 

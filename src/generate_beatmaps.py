@@ -60,10 +60,10 @@ def main():
     for song_folder in dirs:
         print(f"Working on {song_folder.name}...")
 
-        config.audio_processing.use_cache = False
+        #config.audio_processing.use_cache = False
 
         # Compute the audio features (MFCCs) and save them to a temporary cache
-        recalculate_mfcc_df_cache([song_folder], config)
+        #recalculate_mfcc_df_cache([song_folder], config)
         
         # The API handles audio processing, feature extraction, and JSON writing
         generate_complete_beatmaps(song_folder, output_folder, stateful_model, config)
