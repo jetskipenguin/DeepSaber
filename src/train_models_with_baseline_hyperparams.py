@@ -56,7 +56,7 @@ def main():
             
             # Simplified, balanced topology for MLSTM
             fixed_params = {
-                'lstm_layers': 2,
+                'lstm_layers': 3,
                 'initial_learning_rate': 0.001,
                 'label_smoothing': 0.1,
                 'depth_0': 128, 'width_0': 4, 'connections_0': 2, 'dropout_0': 0.3,
