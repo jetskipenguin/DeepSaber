@@ -55,13 +55,38 @@ def main():
             hp = kt.HyperParameters()
             
             # Simplified, balanced topology for MLSTM
-            fixed_params = {
-                'lstm_layers': 3,
-                'initial_learning_rate': 0.001,
-                'label_smoothing': 0.1,
-                'depth_0': 128, 'width_0': 4, 'connections_0': 2, 'dropout_0': 0.3,
-                'depth_1': 128, 'width_1': 4, 'connections_1': 2, 'dropout_1': 0.3,
-            }
+            fixed_params = {'connections_0': 2,
+                        'connections_1': 2,
+                        'connections_2': 2,
+                        'connections_3': 3,
+                        'connections_4': 1,
+                        'connections_5': 3,
+                        'connections_6': 2,
+                        'depth_0': 18,
+                        'depth_1': 23,
+                        'depth_2': 43,
+                        'depth_3': 13,
+                        'depth_4': 52,
+                        'depth_5': 5,
+                        'depth_6': 11,
+                        'dropout_0': 0.25612932926324405,
+                        'dropout_1': 0.1620424523625309,
+                        'dropout_2': 0.4720468723284278,
+                        'dropout_3': 0.43881829788147036,
+                        'dropout_4': 0.44741780640383355,
+                        'dropout_5': 0.3327191857714107,
+                        'dropout_6': 0.1367707920005909,
+                        'initial_learning_rate': 0.008,
+                        'label_smoothing': 0.13716631669361445,
+                        'lstm_layers': 3,
+                        'width_0': 16,
+                        'width_1': 9,
+                        'width_2': 15,
+                        'width_3': 16,
+                        'width_4': 5,
+                        'width_5': 11,
+                        'width_6': 4,
+                        }
             for param, val_hp in fixed_params.items():
                 hp.Fixed(param, value=val_hp)
 
