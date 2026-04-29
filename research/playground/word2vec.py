@@ -80,11 +80,11 @@ def train_batch(corpus_path, models_folder, batch: pd.DataFrame):
             print(f'Training settings: {settings}')
             if settings['data'] == 'raw':
                 model = models[settings['model']](corpus_file=str(corpus_path),
-                                                  size=settings['size'],
+                                                  vector_size=settings['size'],
                                                   workers=16, min_count=15)
             else:
                 model = models[settings['model']](sentences=MyCorpus(corpus_path),
-                                                  size=settings['size'],
+                                                  vector_size=settings['size'],
                                                   workers=16, min_count=15)
 
             model_name = models_folder / f'{settings["model"]}-{settings["size"]}-{settings["data"]}.model'
@@ -103,8 +103,8 @@ def get_trained_model(corpus_path):
     # model = gensim.models.word2vec.Word2Vec(corpus_file=str(corpus_path), size=32, workers=32,
     #                                         max_vocab_size=4e5, min_count=5, iter=10,
     #                                         window=3)
-    model = gensim.models.FastText(corpus_file=str(corpus_path), size=128, workers=16,
-                                   max_vocab_size=4e5, min_count=5, iter=1,
+    model = gensim.models.FastText(corpus_file=str(corpus_path), vector_size=128, workers=16,
+                                   max_vocab_size=4e5, min_count=5, epochs=1,
                                    window=2)
 
     return model
@@ -179,7 +179,7 @@ def resume_training(model, corpus_path=None):
     # and `new vocabulary words <online_w2v_tutorial.ipynb>`_:
     #
     model.build_vocab(sentences, update=True)
-    model.is_train(sentences, total_examples=model.corpus_count, epochs=model.iter)
+    model.train(sentences, total_examples=model.corpus_count, epochs=model.epochs)
     # cleaning up temporary file
     ###############################################################################
     # You may need to tweak the ``total_words`` parameter to ``wordvec()``,
@@ -337,7 +337,7 @@ def model2dict():
     #
     # re-enable logging
     logging.root.level = logging.INFO
-    most_similars_precalc = {word: model.wv.most_similar(word) for word in model.wv.index2word}
+    most_similars_precalc = {word: model.wv.most_similar(word) for word in model.wv.index_to_key}
     for i, (key, value) in enumerate(most_similars_precalc.items()):
         if i == 3:
             break
@@ -413,8 +413,8 @@ def reduce_dimensions(model):
 
     vectors = []  # positions in vector space
     labels = []  # keep track of words to label our data again later
-    # for word in model.wv.vocab:
-    for word in model.wv.index2entity[:5000]:
+    # for word in model.wv.key_to_index:
+    for word in model.wv.index_to_key[:5000]:
         vectors.append(model.wv[word])
         labels.append(word)
 
